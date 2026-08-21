@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Detective Challenge</title>
+<style>
+:root{
+  --bg1:#10052d; --bg2:#21105c; --card:#171044; --line:#6048a8;
+  --text:#f8f7ff; --muted:#c7c0e8; --accent:#ffd447;
+  --good:#35e66f; --bad:#ff5d73; --blue:#48b8ff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; color:var(--text);
+  font-family:Inter,Segoe UI,Arial,sans-serif;
+  background:
+    radial-gradient(circle at 15% 10%, #3c197a 0, transparent 28%),
+    radial-gradient(circle at 85% 20%, #182f78 0, transparent 25%),
+    linear-gradient(135deg,var(--bg1),var(--bg2));
+}
+button{font:inherit}
+.app{max-width:1050px;margin:auto;padding:22px}
+header{text-align:center;padding:12px 0 20px}
+.logo{font-size:clamp(34px,6vw,64px);font-weight:900;letter-spacing:1px}
+.logo span{color:var(--accent)}
+.tag{font-size:18px;color:var(--muted);margin-top:5px}
+.stats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:15px 0}
+.stat{background:#120b35;border:1px solid var(--line);border-radius:16px;padding:10px 18px;min-width:145px}
+.stat b{display:block;font-size:25px;color:var(--accent)}
+.stat small{color:var(--muted)}
+.screen{display:none}
+.screen.active{display:block}
+.card{
+  background:rgba(23,16,68,.94);border:1px solid var(--line);
+  border-radius:24px;padding:28px;box-shadow:0 20px 50px rgba(0,0,0,.25);
+}
+.missions{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+.mission{padding:20px;border-radius:20px;border:1px solid var(--line);background:#151044}
+.mission .icon{font-size:42px}.mission h3{margin:8px 0}.mission p{color:var(--muted);line-height:1.5}
+.primary{
+  border:0;background:var(--accent);color:#231400;font-weight:900;
+  padding:15px 28px;border-radius:999px;cursor:pointer;transition:.2s;
+}
+.primary:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.center{text-align:center}
+.progress-row{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:8px}
+.progress{height:12px;background:#0d0827;border-radius:99px;overflow:hidden}
+.progress > div{height:100%;width:0;background:var(--accent);transition:.3s}
+.question-head{display:flex;gap:14px;align-items:center;margin:22px 0}
+.q-icon{font-size:44px}
+.question{font-size:clamp(22px,3vw,31px);font-weight:800;line-height:1.3;margin:18px 0 22px}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.option{
+  border:1px solid #6b5cb4;background:#110b35;color:var(--text);
+  border-radius:17px;padding:17px;text-align:left;cursor:pointer;
+  transition:.18s;min-height:70px;font-weight:700;
+}
+.option:hover:not(:disabled){transform:translateY(-2px);border-color:var(--accent);background:#1a1249}
+.option:disabled{cursor:default}
+.option.correct{border-color:var(--good);background:rgba(53,230,111,.15)}
+.option.wrong{border-color:var(--bad);background:rgba(255,93,115,.14)}
+.option .letter{display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;border-radius:50%;background:#2a1c67;margin-right:10px;color:var(--accent)}
+.hint{margin-top:15px;color:var(--muted);background:#100b31;border-radius:14px;padding:12px 15px}
+.feedback{margin-top:18px;padding:18px;border-radius:18px;display:none}
+.feedback.show{display:block}
+.feedback.good{background:rgba(53,230,111,.12);border:1px solid #2cae57}
+.feedback.bad{background:rgba(255,93,115,.10);border:1px solid #b53e50}
+.feedback strong{font-size:22px}
+.next-wrap{text-align:center;margin-top:18px}
+.next{display:none}
+.next.show{display:inline-block}
+.result-score{font-size:70px;font-weight:900;color:var(--accent);margin:15px 0}
+.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#2b1d69;color:#dcd5ff;margin:5px}
+.result-box{max-width:650px;margin:auto}
+.review{margin-top:22px;text-align:left}
+.review div{padding:10px 0;border-bottom:1px solid #3b2d74}
+.footer{text-align:center;color:#9e96c4;font-size:13px;margin:25px 0 5px}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:20}
+@media(max-width:760px){
+ .missions{grid-template-columns:1fr}.options{grid-template-columns:1fr}
+ .card{padding:20px}.app{padding:12px}
+}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="app">
+<header>
+  <div class="logo">🤖 AI <span>DETECTIVE</span></div>
+  <div class="tag">Can you discover what AI is doing?</div>
+  <div class="stats">
+    <div class="stat"><b id="topScore">0</b><small>POINTS</small></div>
+    <div class="stat"><b id="topQ">0/15</b><small>QUESTIONS</small></div>
+    <div class="stat"><b id="topStreak">0</b><small>STREAK 🔥</small></div>
+  </div>
+</header>
+
+<section id="start" class="screen active">
+  <div class="card center">
+    <h1>🎮 Your Mission</h1>
+    <p style="font-size:18px;color:var(--muted);line-height:1.6">
+      You will solve 15 mini-challenges about <b>Computer Vision</b>,
+      <b>NLP</b>, and <b>Data & Statistics</b>. Choose carefully, earn points,
+      and watch for the celebration!
+    </p>
+    <div class="missions">
+      <div class="mission"><div class="icon">👁️</div><h3>Computer Vision</h3><p>What can AI see and understand in images and videos?</p><span class="badge">5 questions</span></div>
+      <div class="mission"><div class="icon">🗣️</div><h3>NLP</h3><p>How can AI work with human language and text?</p><span class="badge">5 questions</span></div>
+      <div class="mission"><div class="icon">📊</div><h3>Data & Statistics</h3><p>How can AI find patterns and make predictions from data?</p><span class="badge">5 questions</span></div>
+    </div>
+    <button class="primary" id="startBtn">🚀 START THE CHALLENGE</button>
+    <p style="color:var(--muted);font-size:14px;margin-top:18px">No login required. Your score stays on this computer.</p>
+  </div>
+</section>
+
+<section id="game" class="screen">
+  <div class="card">
+    <div class="progress-row"><span id="missionLabel">Mission 1</span><span id="qLabel">Question 1 of 15</span></div>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="question-head"><div class="q-icon" id="qIcon">🔍</div><div><h2 id="qTitle" style="margin:0">AI Challenge</h2><span id="qTopic" class="badge">Which AI domain?</span></div></div>
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+    <div class="hint">💡 <b>Think like a detective:</b> <span id="hint">Identify whether the AI is working mainly with images, language, or numerical patterns.</span></div>
+    <div id="feedback" class="feedback">
+      <strong id="feedbackTitle"></strong>
+      <p id="feedbackText" style="line-height:1.6;margin-bottom:0"></p>
+    </div>
+    <div class="next-wrap"><button class="primary next" id="nextBtn">NEXT CHALLENGE ➜</button></div>
+  </div>
+</section>
+
+<section id="result" class="screen">
+  <div class="card center result-box">
+    <div style="font-size:55px">🏆</div>
+    <h1>Mission Complete!</h1>
+    <div class="result-score" id="finalScore">0 / 150</div>
+    <div id="finalMessage"></div>
+    <div style="margin:18px 0">
+      <span class="badge">👁️ Vision: <b id="visionScore">0/5</b></span>
+      <span class="badge">🗣️ NLP: <b id="nlpScore">0/5</b></span>
+      <span class="badge">📊 Data: <b id="dataScore">0/5</b></span>
+    </div>
+    <button class="primary" id="restartBtn">🔄 PLAY AGAIN</button>
+    <div class="review" id="review"></div>
+  </div>
+</section>
+
+<div class="footer">AI Detective Challenge • Classroom learning game • Built for students</div>
+</div>
+
+<script>
+const questions = [
+
+ {m:"Computer Vision",icon:"👁️",topic:"Mystery",q:"A school camera checks a crowd and identifies which people are wearing masks. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:0,h:"Is the AI mainly looking at an image/video, reading language, or finding patterns in numbers?",e:"The AI is analyzing camera images, so this is Computer Vision."},
+ {m:"NLP",icon:"🗣️",topic:"Mystery",q:"An app changes an English sentence into Kannada while keeping its meaning. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:1,h:"The AI is working with one human language and producing another.",e:"Machine translation works with human language, so this is NLP."},
+ {m:"Data & Statistics",icon:"📊",topic:"Mystery",q:"A school gives an AI the study hours and marks of hundreds of students and uses the pattern to estimate the marks of a new student. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:2,h:"The AI is learning from numerical records and patterns.",e:"The AI is using numerical data and statistical patterns to make a prediction, so this is Data & Statistics."},
+ {m:"Computer Vision",icon:"👁️",topic:"Mystery",q:"An AI receives a photograph and identifies it as a cat. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:0,h:"The AI has to understand what is shown in a photograph.",e:"Identifying an object in a photograph is a Computer Vision task."},
+ {m:"Data & Statistics",icon:"📊",topic:"Mystery",q:"A shopping website studies what products thousands of customers viewed and bought, then predicts which product a customer may like next. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:2,h:"The system is learning from records of past customer behaviour.",e:"The AI is finding patterns in customer data to make a prediction, so this is Data & Statistics."},
+ {m:"NLP",icon:"🗣️",topic:"Mystery",q:"A student types “This movie was amazing!” and an AI decides that the review is positive. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:1,h:"The AI is working with a written sentence. Which area works with human language?",e:"The AI is understanding text and its sentiment, so this is NLP."},
+ {m:"Computer Vision",icon:"👁️",topic:"Mystery",q:"A road-safety system looks at road images and highlights potholes automatically. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:0,h:"The system needs to understand what is visible in the road image.",e:"The AI is analyzing road images to identify potholes, so this is Computer Vision."},
+ {m:"Data & Statistics",icon:"📊",topic:"Mystery",q:"A shop has recorded its daily sales for several years and uses those records to forecast next month's sales. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:2,h:"The prediction is based on many previous numerical records.",e:"The AI is using historical numerical data and patterns for forecasting, so this is Data & Statistics."},
+ {m:"NLP",icon:"🗣️",topic:"Mystery",q:"An email system reads incoming messages and classifies them as spam or not spam based on their words and content. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:1,h:"The AI is examining the content of written messages.",e:"The system is analyzing language in emails, so this is NLP."},
+ {m:"Computer Vision",icon:"👁️",topic:"Mystery",q:"A traffic camera detects cars, buses and bicycles in a road video and draws boxes around them. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:0,h:"What is the AI actually observing?",e:"The AI is detecting objects in video, so this is Computer Vision."},
+ {m:"Data & Statistics",icon:"📊",topic:"Mystery",q:"A teacher enters the marks of students from several tests. An AI finds a pattern showing how performance changes over time. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:2,h:"The AI is finding a pattern in numerical records.",e:"Finding patterns and relationships in numerical records is Data & Statistics."},
+ {m:"Computer Vision",icon:"👁️",topic:"Mystery",q:"A phone camera recognizes the owner's face and unlocks the phone. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:0,h:"Think about what the phone camera is analyzing.",e:"The AI is analyzing facial images, so this is Computer Vision."},
+ {m:"Data & Statistics",icon:"📊",topic:"Mystery",q:"An AI is trained using thousands of past exam records containing attendance, study hours and marks. It learns relationships between these values. Which AI area best describes this?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:2,h:"The examples contain numerical measurements and relationships.",e:"The AI is learning relationships from numerical records, so this is Data & Statistics."},
+ {m:"NLP",icon:"🗣️",topic:"Mystery",q:"A chatbot reads a student's question and gives a written answer in a natural way. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:1,h:"The input and response are mainly made of human language.",e:"The chatbot is processing and generating language, so this is NLP."},
+ {m:"NLP",icon:"🗣️",topic:"Mystery",q:"An AI reads “The service was terrible and very slow” and identifies the writer's opinion as negative. Which AI area is being used?",opts:["Computer Vision", "NLP", "Data & Statistics","Robotics"],a:1,h:"The AI is interpreting the meaning and feeling in a sentence.",e:"Understanding sentiment in text is an NLP task."}
+];
+
+let index=0,score=0,streak=0,answered=0,correctBy={Vision:0,NLP:0,Data:0};
+const $=id=>document.getElementById(id);
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+  $(id).classList.add("active");
+}
+function updateTop(){
+  $("topScore").textContent=score;
+  $("topQ").textContent=answered+"/15";
+  $("topStreak").textContent=streak;
+}
+function loadQuestion(){
+  const x=questions[index];
+  $("missionLabel").textContent="Mixed Challenge";
+  $("qLabel").textContent="Question "+(index+1)+" of 15";
+  $("bar").style.width=((index)/15*100)+"%";
+  $("qIcon").textContent="🔍";
+  $("qTitle").textContent="AI Challenge";
+  $("qTopic").textContent="Which AI domain?";
+  $("question").textContent=x.q;
+  $("hint").textContent=x.h;
+  $("feedback").className="feedback";
+  $("nextBtn").className="primary next";
+  $("options").innerHTML="";
+  x.opts.forEach((opt,i)=>{
+    const b=document.createElement("button");
+    b.className="option";
+    b.innerHTML='<span class="letter">'+String.fromCharCode(65+i)+'</span>'+opt;
+    b.addEventListener("click",()=>answer(i,b));
+    $("options").appendChild(b);
+  });
+}
+function answer(choice,clicked){
+  const x=questions[index];
+  document.querySelectorAll(".option").forEach(b=>b.disabled=true);
+  document.querySelectorAll(".option")[x.a].classList.add("correct");
+  answered++;
+  if(choice===x.a){
+    score+=10; streak++;
+    if(x.m==="Computer Vision")correctBy.Vision++;
+    else if(x.m==="NLP")correctBy.NLP++;
+    else correctBy.Data++;
+    $("feedback").className="feedback good show";
+    $("feedbackTitle").textContent="🎉 CORRECT! +10 POINTS";
+    $("feedbackText").textContent="Answer: "+x.m+". "+x.e;
+    burst();
+  }else{
+    clicked.classList.add("wrong"); streak=0;
+    $("feedback").className="feedback bad show";
+    $("feedbackTitle").textContent="❌ NOT QUITE!";
+    $("feedbackText").textContent="The best answer is “"+x.opts[x.a]+"”. "+x.e;
+  }
+  updateTop();
+  $("nextBtn").className="primary next show";
+  $("nextBtn").textContent=index===questions.length-1?"🏆 SEE MY SCORE":"NEXT CHALLENGE ➜";
+}
+$("startBtn").addEventListener("click",()=>{index=0;score=0;streak=0;answered=0;correctBy={Vision:0,NLP:0,Data:0};updateTop();show("game");loadQuestion();});
+$("nextBtn").addEventListener("click",()=>{
+  if(index<questions.length-1){index++;loadQuestion();}
+  else finish();
+});
+$("restartBtn").addEventListener("click",()=>{$("startBtn").click()});
+
+function finish(){
+  show("result");
+  $("finalScore").textContent=score+" / 150";
+  $("visionScore").textContent=correctBy.Vision+"/5";
+  $("nlpScore").textContent=correctBy.NLP+"/5";
+  $("dataScore").textContent=correctBy.Data+"/5";
+  let msg=score>=130?"🌟 AI Expert! You really think like an AI detective!":
+          score>=100?"🚀 Excellent work! You found many AI patterns!":
+          score>=70?"👏 Good job! Keep observing how AI works!":
+          "💡 Great start! Try again and beat your score!";
+  $("finalMessage").innerHTML="<h2>"+msg+"</h2><p style='color:var(--muted)'>Challenge yourself to improve your score.</p>";
+  $("review").innerHTML="<h3>What you discovered</h3><div>👁️ <b>Computer Vision</b> → AI works with images and videos.</div><div>🗣️ <b>NLP</b> → AI works with human language and text.</div><div>📊 <b>Data & Statistics</b> → AI learns patterns from data and can make predictions.</div>";
+  burst(80);
+}
+function burst(count=45){
+  const c=$("confetti"),ctx=c.getContext("2d");
+  c.width=innerWidth;c.height=innerHeight;
+  const pieces=Array.from({length:count},()=>({
+    x:innerWidth/2,y:innerHeight*.35,
+    vx:(Math.random()-.5)*12,vy:Math.random()*-10-3,
+    g:.35+Math.random()*.2,s:5+Math.random()*7,
+    r:Math.random()*Math.PI,vr:(Math.random()-.5)*.25,
+    life:70+Math.random()*35
+  }));
+  let frame=0;
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    pieces.forEach(p=>{
+      p.x+=p.vx;p.vy+=p.g;p.y+=p.vy;p.r+=p.vr;p.life--;
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);
+      ctx.fillStyle=["#ffd447","#48b8ff","#35e66f","#ff5d73","#d6a4ff","#ffffff"][Math.floor(Math.random()*6)];
+      ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s);
+      ctx.restore();
+    });
+    if(frame++<110)requestAnimationFrame(draw);else ctx.clearRect(0,0,c.width,c.height);
+  }
+  draw();
+}
+window.addEventListener("resize",()=>{const c=$("confetti");c.width=innerWidth;c.height=innerHeight});
+</script>
+</body>
+</html>
